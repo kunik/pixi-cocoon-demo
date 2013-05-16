@@ -1,19 +1,101 @@
-function Stats() {
-  this.objectsCount = 0;
-  this.fps = 0;
-  this.ms = 0;
-}
+var Stats = (function() {
+  return _constructor;
+
+  function _constructor(reporter, reportInterval) {
+    var objectsCount = 0;
+
+    var startTime = Date.now();
+    var prevTime = startTime;
+
+    var fps, fpsMin, fpsMax;
+    var ms, msMin, msMax;
+    var framesCount;
+
+    var reportIntervalId;
+
+    var _this = {
+      reset: function() {
+        fps = 0, fpsMin = Infinity, fpsMax = 0;
+        ms  = 0, msMin  = Infinity, msMax  = 0;
+
+        framesCount = 0;
+      },
+      start: function() {
+        return startTime = Date.now();
+      },
+      end: function() {
+        var endTime = Date.now();
+
+        ms = endTime - startTime;
+        msMin = Math.min(msMin, ms);
+        msMax = Math.max(msMax, ms);
+
+        framesCount++;
+
+        if (endTime > prevTime + 1000 ) {
+          fps = Math.round((framesCount * 1000) / (endTime - prevTime));
+          fpsMin = Math.min(fpsMin, fps);
+          fpsMax = Math.max(fpsMax, fps);
+
+          prevTime = endTime;
+          framesCount = 0;
+        }
+
+        return endTime;
+      },
+      update: function() {
+        return startTime = _this.end();
+      },
+      objectAdded: function() {
+        return ++objectsCount;
+      },
+      info: function() {
+        return {
+          objects: objectsCount,
+          fps: {
+            now: fps,
+            min: fpsMin,
+            max: fpsMax
+          },
+          ms: {
+            now: ms,
+            min: msMin,
+            max: msMax
+          }
+        };
+      },
+      bindReporter: function(reporter, reportInterval) {
+        if (reportIntervalId) {
+          clearInterval(reportIntervalId);
+        }
+
+        reportIntervalId = setInterval(function() {
+          reporter.call(_this, _this.info());
+        }, reportInterval || 1000);
+      }
+    };
+
+    _this.reset();
+
+    if (reporter) {
+      _this.bindReporter(reporter, reportInterval);
+    }
+
+    return _this;
+  }
+
+})();
 
 (function() {
   var minX = 0, minY = 0;
-  var maxX = 800, maxY = 600;
+  var maxX = 0, maxY = 0;
   var initialObjectsAmount = 10;
   var objectsPortion = 10;
   var gravity = 0.75//1.5 ;
 
   var textures = {};
   var bunnys = [];
-  var stats = new Stats();
+  var stats = Stats();
 
   var renderer, stage, container;
 
@@ -29,12 +111,13 @@ function Stats() {
     loadTextures();
     createRenderer();
     createStage();
+    createDebugPanel();
 
     renderScene();
   }
 
   function update() {
-    //stats.start();
+    stats.start();
 
     // if isAdding..
     //
@@ -42,7 +125,7 @@ function Stats() {
     updateBannysPosition();
     renderScene();
 
-    //stats.end();
+    stats.end();
   }
 
   function updateBannysPosition() {
@@ -86,6 +169,7 @@ function Stats() {
     for (var i = objectsPortion; i--;) {
       bunny = createBunny();
       container.addChild(bunny);
+      stats.objectAdded();
     }
   }
 
@@ -102,7 +186,6 @@ function Stats() {
     //bunny.rotation = Math.random() - 0.5;
 
     bunnys.push(bunny);
-    stats.objectsCount++;
     return bunny;
   }
 
@@ -113,20 +196,21 @@ function Stats() {
   }
 
   function createRenderer() {
-    renderer = PIXI.autoDetectRenderer(maxX, maxY);
+    recalculateDimensions();
+
+    var canvas = document.createElement('canvas');//(navigator.isCocoonJS ? "screencanvas" : "canvas");
+    renderer = new PIXI.CanvasRenderer(maxX, maxY);
 
     if (!renderer instanceof PIXI.WebGLRenderer) {
       renderer.context.mozImageSmoothingEnabled = false;
       renderer.context.webkitImageSmoothingEnabled = false;
     }
 
-    // display it
     document.body.appendChild(renderer.view);
-    renderer.view.style.position = "absolute";
   }
 
   function createStage() {
-    stage = new PIXI.Stage(0xFFFFFF);
+    stage = new PIXI.Stage();//(0xFFFFFF);
     container = new PIXI.DisplayObjectContainer();
 
     stage.addChild(container);
@@ -134,10 +218,31 @@ function Stats() {
     addSomeBunnys();
   }
 
-  function resizeRenderer() {
+  function createDebugPanel() {
+    //hack for getting font height
+    PIXI.Text.heightCache["font: 15px Arial;"] = 17;
+    var debugPanel = new PIXI.Text("", {font:"15px Arial", fill:"red", align: "left"});
+    debugPanel.position.x = 20;
+    debugPanel.position.y = 20;
+    stage.addChild(debugPanel);
+
+    stats.bindReporter(function(info) {
+      var debugInfo = [
+        'OBJECTS: ', info.objects, '\n',
+        'FPS: ', info.fps.now, ' [', info.fps.min, '/', info.fps.max, ']\n',
+        'FRAME_TIME: ', info.ms.now, ' [', info.ms.min, '/' , info.ms.max, ']'].join('');
+
+      debugPanel.setText(debugInfo);
+    });
+  }
+
+  function recalculateDimensions() {
     maxX = window.innerWidth;
     maxY = window.innerHeight;
+  }
 
+  function resizeRenderer() {
+    recalculateDimensions();
     renderer.resize(maxX, maxY);
   }
 
