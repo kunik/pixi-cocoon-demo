@@ -96,7 +96,7 @@ var Stats = (function() {
   var maxX = 0, maxY = 0;
   var screenArea = 1;
   var initialObjectsAmount = 10;
-  var objectsPortion = 10;
+  var objectsPortion = 1;//10;
   var gravity = 0.75//1.5 ;
   var isAddingObjects = false;
 
@@ -108,8 +108,9 @@ var Stats = (function() {
 
   bindListeners();
 
-  //patch pixi to count objects and size
+  // PIXI patches
   (function() {
+    //patch pixi to count objects and size
     var realAddChild = PIXI.DisplayObjectContainer.prototype.addChild;
     PIXI.DisplayObjectContainer.prototype.addChild = function(child) {
       if (child.texture) {
@@ -117,6 +118,11 @@ var Stats = (function() {
       }
       realAddChild.call(this, child);
     };
+
+    PIXI.InteractionManager.prototype.onMouseMove =
+    PIXI.InteractionManager.prototype.onTouchMove =
+    PIXI.InteractionManager.prototype.onTouchStart =
+    PIXI.InteractionManager.prototype.onTouchEnd = function() {};
   })();
 
   function bindListeners() {
@@ -186,7 +192,8 @@ var Stats = (function() {
   function addSomeBunnys() {
     var bunny;
     for (var i = objectsPortion; i--;) {
-      bunny = createBunny();
+      //bunny = createBunny();
+      bunny = createBigBunny();
 
       container.addChild(bunny);
     }
@@ -194,16 +201,27 @@ var Stats = (function() {
 
   function createBunny() {
     var bunny = new PIXI.Sprite(textures['bunny'], {x:0, y:0, width:26, height:37});
-    console.log(bunny.texture);
+
     bunny.speedX = Math.random() * 10;
     bunny.speedY = (Math.random() * 10) - 5;
 
     bunny.anchor.x = 0.5;
     bunny.anchor.y = 1;
-    //bunny.alpha = 0.3 + Math.random() * 0.7;
     bunny.scale.y = 1;
 
-    //bunny.rotation = Math.random() - 0.5;
+    bunnys.push(bunny);
+    return bunny;
+  }
+
+  function createBigBunny() {
+    var bunny = new PIXI.Sprite(textures['bunny_big'], {x:0, y:0, width:145, height:125});
+
+    bunny.speedX = Math.random() * 10;
+    bunny.speedY = (Math.random() * 10) - 5;
+
+    bunny.anchor.x = 0.5;
+    bunny.anchor.y = 1;
+    bunny.scale.y = 1;
 
     bunnys.push(bunny);
     return bunny;
@@ -212,6 +230,7 @@ var Stats = (function() {
   function loadTextures() {
     textures = {
       bunny: new PIXI.Texture.fromImage("img/bunny.png"),
+      bunny_big: new PIXI.Texture.fromImage("img/bunny_big.png"),
       button: new PIXI.Texture.fromImage("img/add.png")
     };
   }
@@ -240,11 +259,17 @@ var Stats = (function() {
   }
 
   function createHandlers() {
-    document.addEventListener('mousedown', function() { isAddingObjects = true; });
-    document.addEventListener('touchstart', function() { isAddingObjects = true; });
+    var down = function() { isAddingObjects = true; return false; };
+    var up = function() { isAddingObjects = false; return false; };
 
-    document.addEventListener('mouseup', function() { isAddingObjects = false; });
-    document.addEventListener('touchend', function() { isAddingObjects = false; });
+    document.ontouchstart = document.onmousedown = down;
+    document.ontouchend = document.onmouseup = up;
+    
+    //document.addEventListener('mousedown', function() { isAddingObjects = true; return false; });
+    //document.addEventListener('touchstart', function() { isAddingObjects = true; return false; });
+
+    //document.addEventListener('mouseup', function() { isAddingObjects = false; return false; });
+    //document.addEventListener('touchend', function() { isAddingObjects = false; return false; });
   }
 
   function createDebugPanel() {
