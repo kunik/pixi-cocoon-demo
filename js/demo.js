@@ -92,6 +92,7 @@ var Stats = (function() {
   var initialObjectsAmount = 10;
   var objectsPortion = 10;
   var gravity = 0.75//1.5 ;
+  var isAddingObjects = false;
 
   var textures = {};
   var bunnys = [];
@@ -119,8 +120,9 @@ var Stats = (function() {
   function update() {
     stats.start();
 
-    // if isAdding..
-    //
+    if (isAddingObjects) {
+      addSomeBunnys();
+    }
 
     updateBannysPosition();
     renderScene();
@@ -191,14 +193,15 @@ var Stats = (function() {
 
   function loadTextures() {
     textures = {
-      bunny: new PIXI.Texture.fromImage("img/bunny.png")
+      bunny: new PIXI.Texture.fromImage("img/bunny.png"),
+      button: new PIXI.Texture.fromImage("img/add.png")
     };
   }
 
   function createRenderer() {
     recalculateDimensions();
 
-    var canvas = document.createElement('canvas');//(navigator.isCocoonJS ? "screencanvas" : "canvas");
+    var canvas = document.createElement('canvas');//CocoonJS.App.createScreenCanvas();
     renderer = new PIXI.CanvasRenderer(maxX, maxY);
 
     if (!renderer instanceof PIXI.WebGLRenderer) {
@@ -210,20 +213,46 @@ var Stats = (function() {
   }
 
   function createStage() {
-    stage = new PIXI.Stage();//(0xFFFFFF);
+    stage = new PIXI.Stage(0xFFFFFF, true);
     container = new PIXI.DisplayObjectContainer();
 
     stage.addChild(container);
+    stage.addChild(createButton());
 
     addSomeBunnys();
+  }
+
+  function createButton() {
+    var button = new PIXI.Sprite(textures['button']);
+
+    button.position.x = 20;
+    button.position.y = 100;
+
+    // make the button interactive
+    button.setInteractive(true);
+
+    document.addEventListener('touchstart', function() { isAddingObjects = true; });
+    document.addEventListener('touchend', function() { isAddingObjects = false; });
+    // set the mousedown and touchstart callback..
+    //button.mousedown = button.touchstart = function(data) {
+      //isAddingObjects = true;
+    //}
+
+    //// set the mouseup and touchend callback..
+    //button.mouseup = button.touchend = function(data){
+      //isAddingObjects = false;
+    //}
+
+    return button;
   }
 
   function createDebugPanel() {
     //hack for getting font height
     PIXI.Text.heightCache["font: 15px Arial;"] = 17;
-    var debugPanel = new PIXI.Text("", {font:"15px Arial", fill:"red", align: "left"});
+    var debugPanel = new PIXI.Text("", {font:"15px Arial", fill:"red", align: "left", stroke: "#CCCCCC", strokeThickness: 7});
     debugPanel.position.x = 20;
     debugPanel.position.y = 20;
+    debugPanel.setInteractive(true);
     stage.addChild(debugPanel);
 
     stats.bindReporter(function(info) {
