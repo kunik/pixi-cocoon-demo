@@ -3,6 +3,7 @@ var Stats = (function() {
 
   function _constructor(reporter, reportInterval) {
     var objectsCount = 0;
+    var objectsArea = 0;
 
     var startTime = Date.now();
     var prevTime = startTime;
@@ -46,12 +47,16 @@ var Stats = (function() {
       update: function() {
         return startTime = _this.end();
       },
-      objectAdded: function() {
-        return ++objectsCount;
+      objectAdded: function(object) {
+        objectsArea += object.width * object.height;
+        objectsCount++;
       },
       info: function() {
         return {
-          objects: objectsCount,
+          objects: {
+            count: objectsCount,
+            area: objectsArea
+          },
           fps: {
             now: fps,
             min: fpsMin,
@@ -89,6 +94,7 @@ var Stats = (function() {
 (function() {
   var minX = 0, minY = 0;
   var maxX = 0, maxY = 0;
+  var screenArea = 1;
   var initialObjectsAmount = 10;
   var objectsPortion = 10;
   var gravity = 0.75//1.5 ;
@@ -102,6 +108,17 @@ var Stats = (function() {
 
   bindListeners();
 
+  //patch pixi to count objects and size
+  (function() {
+    var realAddChild = PIXI.DisplayObjectContainer.prototype.addChild;
+    PIXI.DisplayObjectContainer.prototype.addChild = function(child) {
+      if (child.texture) {
+        stats.objectAdded(child);
+      }
+      realAddChild.call(this, child);
+    };
+  })();
+
   function bindListeners() {
     window.addEventListener('load', init, false);
     window.onresize = resizeRenderer;
@@ -112,7 +129,7 @@ var Stats = (function() {
     loadTextures();
     createRenderer();
     createStage();
-    createDebugPanel();
+    createHandlers();
 
     renderScene();
   }
@@ -170,13 +187,14 @@ var Stats = (function() {
     var bunny;
     for (var i = objectsPortion; i--;) {
       bunny = createBunny();
+
       container.addChild(bunny);
-      stats.objectAdded();
     }
   }
 
   function createBunny() {
     var bunny = new PIXI.Sprite(textures['bunny'], {x:0, y:0, width:26, height:37});
+    console.log(bunny.texture);
     bunny.speedX = Math.random() * 10;
     bunny.speedY = (Math.random() * 10) - 5;
 
@@ -217,33 +235,16 @@ var Stats = (function() {
     container = new PIXI.DisplayObjectContainer();
 
     stage.addChild(container);
-    stage.addChild(createButton());
-
+    stage.addChild(createDebugPanel());
     addSomeBunnys();
   }
 
-  function createButton() {
-    var button = new PIXI.Sprite(textures['button']);
-
-    button.position.x = 20;
-    button.position.y = 100;
-
-    // make the button interactive
-    button.setInteractive(true);
-
+  function createHandlers() {
+    document.addEventListener('mousedown', function() { isAddingObjects = true; });
     document.addEventListener('touchstart', function() { isAddingObjects = true; });
+
+    document.addEventListener('mouseup', function() { isAddingObjects = false; });
     document.addEventListener('touchend', function() { isAddingObjects = false; });
-    // set the mousedown and touchstart callback..
-    //button.mousedown = button.touchstart = function(data) {
-      //isAddingObjects = true;
-    //}
-
-    //// set the mouseup and touchend callback..
-    //button.mouseup = button.touchend = function(data){
-      //isAddingObjects = false;
-    //}
-
-    return button;
   }
 
   function createDebugPanel() {
@@ -253,21 +254,24 @@ var Stats = (function() {
     debugPanel.position.x = 20;
     debugPanel.position.y = 20;
     debugPanel.setInteractive(true);
-    stage.addChild(debugPanel);
 
     stats.bindReporter(function(info) {
       var debugInfo = [
-        'OBJECTS: ', info.objects, '\n',
+        'OBJECTS: ', info.objects.count, ' -> ', info.objects.area, 'px^2 \n',
+        'NUMBER_OF_SCREENS: ', Math.round((info.objects.area / screenArea) * 100) / 100 , '\n',
         'FPS: ', info.fps.now, ' [', info.fps.min, '/', info.fps.max, ']\n',
         'FRAME_TIME: ', info.ms.now, ' [', info.ms.min, '/' , info.ms.max, ']'].join('');
 
       debugPanel.setText(debugInfo);
     });
+
+    return debugPanel;
   }
 
   function recalculateDimensions() {
     maxX = window.innerWidth;
     maxY = window.innerHeight;
+    screenArea = maxX * maxY;
   }
 
   function resizeRenderer() {
